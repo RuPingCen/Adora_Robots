@@ -7,15 +7,12 @@ import time
 
 import numpy as np
 import pyarrow as pa
-
-from SerialLiftingMotor import SerialLiftingMotor
  
-
 
 class Operator:
  
     def __init__(self):
-        print('init test SerialLiftingMotor node \n')
+        print('init test  node \n')
         self.counter = 0
 
     def on_event(
@@ -34,17 +31,20 @@ class Operator:
     ):
         print("input event")
         self.counter = self.counter +1
-        position = 0
+        yaw_value = 0
+        pitch_value = 0
         if self.counter <= 20:
-            position = 0 
+            pitch_value = 0 
+            yaw_value = 0
         elif self.counter <= 40 :
-            position = 32768*200
+            pitch_value = 1
+            yaw_value = 1
         else:
             self.counter = 0
        
         send_output(
-            "cmd_position",
-            pa.array([position]),
+            "head_motor_angle",
+            pa.array([pitch_value,yaw_value]),
             dora_input["metadata"],
         )
         return DoraStatus.CONTINUE

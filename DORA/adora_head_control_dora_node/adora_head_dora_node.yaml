@@ -1,18 +1,17 @@
 nodes:
-  - id: test_SerialLiftingMotor
+  - id: test_head_control
     operator:
-      python: ./test_SerialLiftingMotor.py
+      python: ./test_head_control.py
       inputs:
-        tick: dora/timer/millis/500
+        tick: dora/timer/millis/900
       outputs:
-        - cmd_position
+        - head_motor_angle
 
 
-  - id: SerialLiftingMotor_driver_dora
+  - id: head_control_driver_dora
     operator:
-      python: ./SerialLiftingMotor_driver_dora.py
+      python: ./head_control_driver_dora.py
       inputs:
-        tick: dora/timer/millis/90
-        cmd_position: test_SerialLiftingMotor/cmd_position
+        head_motor_angle: test_head_control/head_motor_angle
       outputs:
-        - cur_position
+        - head_motor_cur_angle
