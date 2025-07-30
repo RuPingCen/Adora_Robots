@@ -14,7 +14,7 @@ std::array<double, 36> cov_array = \
  0,    0,    0,   0,   1e6, 0,
  0,    0,    0,   0,   0,   1e3};
 
-DtControl::DtControl(void) : Node("dt_ros2_node")
+DtControl::DtControl(void) : Node("adora_bringup_node")
 {
   declare_parameter("dt_port", "/dev/ttyUSB0");
   declare_parameter("dt_baudrate", 115200);
@@ -35,95 +35,95 @@ DtControl::DtControl(void) : Node("dt_ros2_node")
 
   auto qos = rclcpp::QoS(100).transient_local();
 
-  pub_.frame = create_publisher<Frame>("/dt/frame_info", 100);
+  pub_.frame = create_publisher<Frame>("/adora_robot/chassis/frame_info", 100);
 
   if(param_.drive_type == "HLS")
   {
-    pub_.drive_hollysys_left_error  = create_publisher<DriveHollysysError>("/dt/drive_left_error_info", 100);
-    pub_.drive_hollysys_right_error = create_publisher<DriveHollysysError>("/dt/drive_right_error_info", 100);
+    pub_.drive_hollysys_left_error  = create_publisher<DriveHollysysError>("/adora_robot/chassis/drive_left_error_info", 100);
+    pub_.drive_hollysys_right_error = create_publisher<DriveHollysysError>("/adora_robot/chassis/drive_right_error_info", 100);
   }
   else if(param_.drive_type == "SDFZ")
   {
-    pub_.drive_sdfz_left_error  = create_publisher<DriveSdfzError>("/dt/drive_left_error_info", 100);
-    pub_.drive_sdfz_right_error = create_publisher<DriveSdfzError>("/dt/drive_right_error_info", 100);
+    pub_.drive_sdfz_left_error  = create_publisher<DriveSdfzError>("/adora_robot/chassis/drive_left_error_info", 100);
+    pub_.drive_sdfz_right_error = create_publisher<DriveSdfzError>("/adora_robot/chassis/drive_right_error_info", 100);
   }
   else
   {
-    pub_.drive_sdfz_left_error  = create_publisher<DriveSdfzError>("/dt/drive_left_error_info", 100);
-    pub_.drive_sdfz_right_error = create_publisher<DriveSdfzError>("/dt/drive_right_error_info", 100);
+    pub_.drive_sdfz_left_error  = create_publisher<DriveSdfzError>("/adora_robot/chassis/drive_left_error_info", 100);
+    pub_.drive_sdfz_right_error = create_publisher<DriveSdfzError>("/adora_robot/chassis/drive_right_error_info", 100);
   }
 
-  pub_.auto_charge      = create_publisher<AutoCharge>             ("/dt/auto_charge_info", 100);
-  pub_.battery          = create_publisher<BatteryState>           ("/dt/battery_info", 100);
-  pub_.date             = create_publisher<ChassisDate>            ("/dt/date_info", qos);
-  pub_.parameter        = create_publisher<ChassisParameter>       ("/dt/parameter_info", qos);
-  pub_.state            = create_publisher<ChassisState>           ("/dt/state_info", 100);
-  pub_.velocity         = create_publisher<ChassisVelocity>        ("/dt/velocity_info", 100);
-  pub_.hardware_version = create_publisher<HardwareVersion>        ("/dt/hardware_version_info", qos);
-  pub_.led_strip_mode   = create_publisher<std_msgs::msg::UInt8>   ("/dt/led_strip_mode_info", 100);
-  pub_.led_strips       = create_publisher<LedStrips>              ("/dt/led_strips_info", 100);
-  pub_.remote_ctrl      = create_publisher<RemoteControl>          ("/dt/remote_control_info", 100);
-  pub_.software_version = create_publisher<SoftwareVersion>        ("/dt/software_version_info", qos);
-  pub_.current          = create_publisher<TwoWheelDiffCurrent>    ("/dt/current_info", 100);
-  pub_.speed            = create_publisher<TwoWheelDiffSpeed>      ("/dt/speed_info", 100);
-  pub_.odom             = create_publisher<nav_msgs::msg::Odometry>("/dt/odom_info", 100);
+  pub_.auto_charge      = create_publisher<AutoCharge>             ("/adora_robot/chassis/auto_charge_info", 100);
+  pub_.battery          = create_publisher<BatteryState>           ("/adora_robot/chassis/battery_info", 100);
+  pub_.date             = create_publisher<ChassisDate>            ("/adora_robot/chassis/date_info", qos);
+  pub_.parameter        = create_publisher<ChassisParameter>       ("/adora_robot/chassis/parameter_info", qos);
+  pub_.state            = create_publisher<ChassisState>           ("/adora_robot/chassis/state_info", 100);
+  pub_.velocity         = create_publisher<ChassisVelocity>        ("/adora_robot/chassis/velocity_info", 100);
+  pub_.hardware_version = create_publisher<HardwareVersion>        ("/adora_robot/chassis/hardware_version_info", qos);
+  pub_.led_strip_mode   = create_publisher<std_msgs::msg::UInt8>   ("/adora_robot/chassis/led_strip_mode_info", 100);
+  pub_.led_strips       = create_publisher<LedStrips>              ("/adora_robot/chassis/led_strips_info", 100);
+  pub_.remote_ctrl      = create_publisher<RemoteControl>          ("/adora_robot/chassis/remote_control_info", 100);
+  pub_.software_version = create_publisher<SoftwareVersion>        ("/adora_robot/chassis/software_version_info", qos);
+  pub_.current          = create_publisher<TwoWheelDiffCurrent>    ("/adora_robot/chassis/current_info", 100);
+  pub_.speed            = create_publisher<TwoWheelDiffSpeed>      ("/adora_robot/chassis/speed_info", 100);
+  pub_.odom             = create_publisher<nav_msgs::msg::Odometry>("/adora_robot/chassis/odom_info", 100);
 
 
-  sub_.velocity = create_subscription<geometry_msgs::msg::Twist>("/dt/velocity_ctrl", 100,
+  sub_.velocity = create_subscription<geometry_msgs::msg::Twist>("/adora_robot/chassis/velocity_ctrl", 100,
   [this](const geometry_msgs::msg::Twist::ConstSharedPtr twist)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetVelocity(twist->linear.x, twist->angular.z);
   });
-  sub_.speed = create_subscription<TwoWheelDiffSpeed>("/dt/speed_ctrl", 100,
+  sub_.speed = create_subscription<TwoWheelDiffSpeed>("/adora_robot/chassis/speed_ctrl", 100,
   [this](const TwoWheelDiffSpeed::ConstSharedPtr speed)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetSpeed(speed->left, speed->right);
   });
-  sub_.stop_ctrl = create_subscription<std_msgs::msg::Bool>("/dt/stop_ctrl", 100,
+  sub_.stop_ctrl = create_subscription<std_msgs::msg::Bool>("/adora_robot/chassis/stop_ctrl", 100,
   [this](const std_msgs::msg::Bool::ConstSharedPtr enable)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetStop(enable->data);
   });
-  sub_.collision_clean = create_subscription<std_msgs::msg::Empty>("/dt/collision_clean", 100,
+  sub_.collision_clean = create_subscription<std_msgs::msg::Empty>("/adora_robot/chassis/collision_clean", 100,
   [this](const std_msgs::msg::Empty::ConstSharedPtr)
   {
     if(subIntervalCheck() == false) {return;}
     pkgCollisionClean();
   });
-  sub_.fault_clean = create_subscription<std_msgs::msg::Empty>("/dt/fault_clean", 100,
+  sub_.fault_clean = create_subscription<std_msgs::msg::Empty>("/adora_robot/chassis/fault_clean", 100,
   [this](const std_msgs::msg::Empty::ConstSharedPtr)
   {
     if(subIntervalCheck() == false) {return;}
     pkgFaultClean();
   });
-  sub_.auto_charge_ctrl = create_subscription<std_msgs::msg::UInt8>("/dt/auto_charge_ctrl", 100,
+  sub_.auto_charge_ctrl = create_subscription<std_msgs::msg::UInt8>("/adora_robot/chassis/auto_charge_ctrl", 100,
   [this](const std_msgs::msg::UInt8::ConstSharedPtr auto_charge_type)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetAutoCharge(auto_charge_type->data);
   });
-  sub_.led_strip_mode = create_subscription<std_msgs::msg::UInt8>("/dt/led_strip_mode_ctrl", 100,
+  sub_.led_strip_mode = create_subscription<std_msgs::msg::UInt8>("/adora_robot/chassis/led_strip_mode_ctrl", 100,
   [this](const std_msgs::msg::UInt8::ConstSharedPtr mode)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetLedStripMode(mode->data);
   });
-  sub_.led_strip = create_subscription<LedStrip>("/dt/led_strip_ctrl", 100,
+  sub_.led_strip = create_subscription<LedStrip>("/adora_robot/chassis/led_strip_ctrl", 100,
   [this](const LedStrip::ConstSharedPtr led_strip)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetLedStrip(*led_strip);
   });
-  sub_.led_strips = create_subscription<LedStrips>("/dt/led_strips_ctrl", 100,
+  sub_.led_strips = create_subscription<LedStrips>("/adora_robot/chassis/led_strips_ctrl", 100,
   [this](const LedStrips::ConstSharedPtr led_strips)
   {
     if(subIntervalCheck() == false) {return;}
     pkgSetLedStrips(*led_strips);
   });
-  sub_.odom_clean = create_subscription<std_msgs::msg::Empty>("/dt/odom_clean", 100,
+  sub_.odom_clean = create_subscription<std_msgs::msg::Empty>("/adora_robot/chassis/odom_clean", 100,
   [this](const std_msgs::msg::Empty::ConstSharedPtr)
   {
     odom_.clean();
