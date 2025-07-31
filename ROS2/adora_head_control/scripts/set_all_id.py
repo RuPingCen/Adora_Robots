@@ -57,7 +57,7 @@ class SerialSliderApp:
 
         # 发送二进制数据
         self.ser.write(bytes(packet))
-        time.sleep(0.01)  # 指令间隔
+        time.sleep(0.01)  # 指令间隔       
 
     def set_angle(self, servo_id, angle, runtime=None):
         """设置舵机转动到指定角度"""
@@ -102,6 +102,19 @@ class SerialSliderApp:
         # 发送写入指令（无参数）设置中间位置
         self._send_command(servo_id, 0x03, [address_map[slot]])
 
+    def restore_factory_settings(self):
+        """恢复出厂设置"""
+        # 构建数据包
+        # 包括固定字头、舵机ID、数据长度、指令类型和参数
+        packet = [
+                0x12, 0x4C,  # 固定字头
+                0x01,  # 舵机ID
+                0x02,
+                0x06,
+                0xF6]
+        # 发送二进制数据
+        self.ser.write(bytes(packet))
+        time.sleep(1)  # 指令间隔
 
     def set_all_motor_id(self, servo_id):
         """设置总线上所有舵机的ID 为输入servo_id"""
@@ -153,7 +166,7 @@ class SerialSliderApp:
  
     def run(self,target_ID):
          
-        #app.set_all_motor_id(target_ID)
+        app.set_all_motor_id(target_ID)
         while True:
             print("当前角度 ID1:", self.get_angle(1))
             print("当前角度 ID2:", self.get_angle(2))
@@ -177,5 +190,7 @@ if __name__ == "__main__":
 
     app = SerialSliderApp()
     
+    app.restore_factory_settings()
+    time.sleep(2)  # 指令间隔
     app.run(args.id)
  
