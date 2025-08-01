@@ -34,13 +34,13 @@ class HeadDSServo(Node):
         self.declare_parameter('device_name', '/dev/ttyUSB0')
         self.declare_parameter('baud_rate', 115200)
 
-        self.declare_parameter('PITCH_MIN_VALUE', 2075)  # 俯仰角范围 
-        self.declare_parameter('PITCH_MAX_VALUE', 3916)  # 俯仰角范围 
-        self.declare_parameter('PITCH_MID_VALUE', 3012)  # 俯仰角范围   中位
+        self.declare_parameter('PITCH_MIN_VALUE', 1480)  # 俯仰角范围  for pro max
+        self.declare_parameter('PITCH_MAX_VALUE', 2160)  # 俯仰角范围 
+        self.declare_parameter('PITCH_MID_VALUE', 1650)  # 俯仰角范围   中位
 
-        self.declare_parameter('YAW_MIN_VALUE', 0)  # 偏航角范围 
-        self.declare_parameter('YAW_MAX_VALUE', 4095)  # 偏航角范围 
-        self.declare_parameter('YAW_MID_VALUE', 3012)  # 偏航角范围  中位
+        self.declare_parameter('YAW_MIN_VALUE', 140)  # 偏航角范围 
+        self.declare_parameter('YAW_MAX_VALUE', 1800)  # 偏航角范围 
+        self.declare_parameter('YAW_MID_VALUE', 800)  # 偏航角范围  中位
         
         # 获取参数值
         self.device_name = self.get_parameter('device_name').value
