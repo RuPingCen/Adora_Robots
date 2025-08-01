@@ -1,0 +1,102 @@
+nodes: 
+  - id: lidar 
+    custom:
+      source: build/livox/livox_dora_driver2/livox_dora_driver_node
+      inputs:
+        tick: dora/timer/millis/100
+      outputs:
+        - pointcloud
+
+  - id: hdl_localization
+    custom:
+      source: build/dora-hdl_localization/hdl_localization
+      inputs: 
+        pointcloud: lidar/pointcloud
+      outputs: 
+        - cur_pose
+
+  - id: pub_road 
+    custom:
+      source: build/map/pub_road/pubroad
+      inputs:
+        tick: dora/timer/millis/200
+      outputs:
+        - road_lane
+        
+  - id: road_lane_publisher_node 
+    custom:
+      source: build/map/road_line_publisher/road_lane_publisher_node
+      inputs:
+        road_lane: pub_road/road_lane
+        cur_pose: hdl_localization/cur_pose
+      outputs:
+        - cur_pose_all  
+            
+  - id: task_pub_node 
+    custom:
+      source: build/planning/mission_planning/task_pub/task_pub_node
+      inputs:
+        tick: dora/timer/millis/20
+      outputs:
+        - road_attri_msg
+
+  - id: task_exc_node
+    custom:
+      source: build/planning/mission_planning/task_exc/task_exc_node
+      inputs:
+        cur_pose_all: road_lane_publisher_node/cur_pose_all
+      outputs:
+        - SetStop_service
+
+  - id: planning  
+    custom:
+      source: build/planning/routing_planning/routing_planning_node
+      inputs:
+        road_lane: pub_road/road_lane   
+        cur_pose_all: road_lane_publisher_node/cur_pose_all
+        road_attri_msg: task_pub_node/road_attri_msg
+        SetStop_service: task_exc_node/SetStop_service
+      outputs:
+        - raw_path  
+        - Request
+
+  - id: lon_control
+    custom:
+      source: build/control/vehicle_control/lon_controller/lon_controller_node
+      inputs:
+        Request: planning/Request
+      outputs:
+        - TrqBreCmd
+        
+  - id: latcontrol
+    custom:
+      source: build/control/vehicle_control/lat_controller/lat_controller_node
+      inputs:
+        raw_path: planning/raw_path
+      outputs:
+        - SteeringCmd #100hz
+
+  # - id: control
+  #   custom:	
+  #     source: build/control/vehicle_control/dora_mickrobot/mickrobotx4
+  #     inputs:
+  #       SteeringCmd: latcontrol/SteeringCmd
+  #       TrqBreCmd: lon_control/TrqBreCmd
+  #       road_attri_msg: task_pub_node/road_attri_msg
+
+  - id: control
+    custom:	
+      source: build/control/vehicle_control/dora_mickrobot/adora_chassis
+      inputs:
+        SteeringCmd: latcontrol/SteeringCmd
+        TrqBreCmd: lon_control/TrqBreCmd
+        road_attri_msg: task_pub_node/road_attri_msg
+
+
+  - id: rerun 
+    custom:
+      source: build/rerun/to_rerun
+      inputs:
+        pointcloud: lidar/pointcloud
+        raw_path: planning/raw_path
+        cur_pose: hdl_localization/cur_pose

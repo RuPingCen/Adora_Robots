@@ -1,0 +1,23 @@
+nodes: 
+  - id: lidar 
+    custom:
+      source: build/livox/livox_dora_driver2/livox_dora_driver_node
+      inputs:
+        tick: dora/timer/millis/100
+      outputs:
+        - pointcloud
+
+
+  - id: hdl_localization
+    custom:
+      source: build/dora-hdl_localization/hdl_localization
+      inputs: 
+        pointcloud: lidar/pointcloud
+        # imu_msg: imu/imu_msg
+      outputs: 
+       - cur_pose
+
+        
+
+
+
