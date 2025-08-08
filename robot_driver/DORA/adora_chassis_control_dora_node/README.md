@@ -1,6 +1,6 @@
 # Adora  chassis node
 
- support: **Adora_A1_Mini**  、**Adora_A1_Pro**  、**Adora_A2_Mini**  、**Adora_A2_Pro** 
+ support: **Adora_A1_Mini**  、**Adora_A1_Pro**  、**Adora_A2_Mini**  、**Adora_A2_Pro** 、**Adora_A2_Max** 
 
 ###   Usage 
 
@@ -39,16 +39,37 @@ make
 sudo chmod 777 /dev/ttyUSB0
 ```
 
-step5： start  chassis node with  Dora 
+**step5**： start  **Adora_A2_Mini** chassis node with  Dora 
 
 ```
 dora start  adora2mini_dataflow.yml --name test
 ```
 
-### show chassis logs
+**step5**： start  **Adora_A2_Pro** chassis node with  Dora 
+
+```
+dora start  adora2pro_dataflow.yml --name test
+```
+
+
+**step5**： start  **Adora_A2_Max** chassis node with  Dora (The **Adora_A2_Max**  and **Adora_A2_Pro**  have the same control protocol )
+
+```
+dora start  adora2max_dataflow.yml --name test
+```
+
+### 
+
+### show  **Adora_A2_Mini** chassis logs 
 
 ```
  dora logs test adoraa2mini_node
+```
+
+### show  **Adora_A2_Pro** chassis logs 
+
+```
+ dora logs test adoraa2pro_node
 ```
 
 ### Chassis receiving/publishing message 

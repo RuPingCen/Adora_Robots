@@ -96,4 +96,20 @@ target_link_libraries(adoraa2mini_node
   pthread
 )
 
+add_executable(adoraa2pro_node src/adora_chassis_a2pro_dora_node.cc 
+)
+target_link_libraries(adoraa2pro_node
+  ${EIGEN_LIBRARIES}
+  ${YAMLCPP_LIBRARIES}
+  #$ENV{HOME}/dora/target/debug/libdora_node_api_cxx.a
+  $ENV{HOME}/dora/target/release/libdora_node_api_c.a
+  #/home/crp/dora_project/dora_mickrobot/thridpart_lib/serial/build/libserial.so
+  libserial.so
+  m
+  rt
+  dl 
+  pthread
+)
+
+
  

@@ -119,6 +119,10 @@ union TXRobotData2
    }prot;
 }TXRobotData2;
 
+
+
+
+
 union RESMode1
 {
    u8 data[40];
@@ -160,5 +164,79 @@ union RESMode2
       u16   Light34;    //
    }prot;
 }RXMode2;
+
+
+
+// 底盘状态
+union AdoraA2Pro_RxData_ChassisState
+{
+   u8 data[26];
+   struct
+   {
+      u16 Header;       
+      u8  Len;              
+      u8  Cmd;            
+      u8  data[20];     
+      u16 Check;        
+   }prot;
+}AdoraA2Pro_RxData_ChassisState;
+
+
+//4.1.1 状态上传开关 [下发帧]
+union EnableStateUploadData
+{
+   u8 data[7];
+   struct
+   {
+      u16 Header;
+      u8  Len;
+      u8  Cmd;
+      u8 EnableState; // 0：关闭       1：开启
+      u16 Check;
+   }prot;
+}EnableStateUploadData;
+
+// 4.11.1 线速角速控制 [下发帧]
+//DT-01 Pro  -- Adora A2 Pro 下发轮子速度结构体
+union AdoraA2ProData1
+{
+   u8 data[10];
+   struct
+   {
+      u16 Header;
+      u8  Len;
+      u8  Cmd;
+      s16 Vx; //线速度 单位：mm/s
+      s16 Vw; //角速度 单位：0.001 rad/s 
+      u16 Check;
+   }prot;
+}AdoraA2ProData1;
+
+union AdoraA2ProData2
+{
+   u8 data[10];
+   struct
+   {
+      u16 Header;
+      u8  Len;
+      u8  Cmd;
+      s16 Lv; //左轮速 单位：mm/s
+      s16 Rv; //右轮速 单位：mm/s
+      u16 Check;
+   }prot;
+}AdoraA2ProData2;
+
+union AdoraA2Pro_Stop
+{
+   u8 data[7];
+   struct
+   {
+      u16 Header;
+      u8  Len;
+      u8  Cmd;
+      u8  Data;
+      u16 Check;
+   }prot;
+}AdoraA2Pro_Stop;
 
 #endif // ROS_DT_MSG_H
