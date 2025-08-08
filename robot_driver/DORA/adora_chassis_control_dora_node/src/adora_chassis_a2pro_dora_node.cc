@@ -58,9 +58,9 @@ serial::Serial ser; // 声明串口对象
 int control_mode = 1;//1开启线速度、角速度反馈模式  2开启速度反馈模式,在launch文件设置
 
 // 初始化串口
-string usart_port = "/dev/ttyACM0";
-int baud_data = 115200;
-int time_out = 1000;
+string usart_port ;
+int baud_data;
+int time_out;
 
 uint16_t len = 0;
 uint8_t data[200];
@@ -368,10 +368,17 @@ int main()
 {
 	std::cout << "AdoraMini chassis node for dora " << std::endl;
  
+	const char* port = std::getenv("USART_PORT");
+	usart_port = std::string(port);
+	baud_data = std::getenv("USART_BUAD") ? std::stoi(std::getenv("USART_BUAD")) : 115200;
+	time_out = std::getenv("USART_TIME_OUT") ? std::stoi(std::getenv("USART_TIME_OUT")) : 1000;
+
+
 	cout<<"usart_port:   "<<usart_port<<endl;
 	cout<<"baud_data:   "<<baud_data<<endl;
 	cout<<"control_mode:   "<<control_mode<<endl;
 	cout<<"time_out:   "<<time_out<<endl;
+ 
  
 	try
 	{

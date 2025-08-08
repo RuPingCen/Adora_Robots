@@ -17,4 +17,9 @@ nodes:
           source: keyboard/CmdVelTwist
       outputs:
         - Odometry
+      envs:
+        USART_PORT: /dev/ttyACM0
+        USART_BUAD: 115200
+        USART_TIME_OUT: 1000
+ 
  
