@@ -1,13 +1,17 @@
 import serial
 import time
 import struct
+import numpy as np
+
 class SerialLiftingMotor: 
-    def __init__(self):
+    def __init__(self, port="/dev/ttyUSB0", baudrate=19200):
         self.ser = None  # 串口对象
         self.serial_opened = False  # 串口状态标志
 
-        self.init_serial("/dev/ttyACM0",19200)
+        self.init_serial(port,baudrate)
         self.motor_init()
+
+
         #其中数值 3276800 表示电机转动100圈，电机转动1圈的数值是32768.
         self.max_lifting_distance = 700
         self.robot_name = "ADORA_A2_MAX"
@@ -17,9 +21,9 @@ class SerialLiftingMotor:
         self.MIN_MOTOR_POSITION = 0
         self.MAX_MOTOR_POSITION = 36044800  #//勿修改！！！ 32768*1100(圈) = 36044800 对应700mm行程的丝杠，
         self.motor_positon_read = 0
-        self.motor_position_set(0)
+        #self.motor_position_set(0)
         # 配置串口参数
-    def init_serial(self, port, baudrate=115200):
+    def init_serial(self, port, baudrate):
         try:
                 # 初始化串口，设置串口参数
             self.ser = serial.Serial(
@@ -29,7 +33,7 @@ class SerialLiftingMotor:
                 parity=serial.PARITY_NONE,  # 校验位，无校验位
                 stopbits=serial.STOPBITS_ONE,  # 停止位1位
                 timeout=0.1  # 超时时间
-        )
+            )
         except Exception as e:
             print("串口初始化失败:", e)
 
@@ -38,7 +42,7 @@ class SerialLiftingMotor:
         #while True:
  
         self.motor_position_read()
-        #time.sleep(0.1)
+        time.sleep(0.01)
 
         uart_buffer_data = self.ser.read_all()  
 
@@ -200,12 +204,12 @@ class SerialLiftingMotor:
             self.ser.open()
             
         # 发送数据
-        self.ser.write(data_array_1)
+       # self.ser.write(data_array_1)
 
 
-    # 输入参数 uint32_msg 表示距离(单位 mm)
-    def cmd_vel_callback(self, uint32_msg):
-        tem_distance = uint32_msg
+    # 输入参数 int32_msg 表示距离(单位 mm)
+    def cmd_vel_callback(self, int32_msg):
+        tem_distance = int32_msg
 		
         if(tem_distance > self.max_lifting_distance):
             tem_distance = self.max_lifting_distance-5 #//预留5mm行程
@@ -214,16 +218,10 @@ class SerialLiftingMotor:
         # 丝杠终点位置： 32768*1100(圈) = 36044800 对应700mm行程的丝杠， 0.63636363
         # 其中32768是电机外部的转轴转动一圈的值。
         # 700mm/0.63636363*32768
-        tem_value = self.float_to_uint32(tem_distance/self.Ratio_K_1*self.Ratio_K_2)
-        print("recived distance  (mm): %d  , control value:  %2.f\n",tem_distance,tem_value)
+        tem_value = np.int32(tem_distance/self.Ratio_K_1*self.Ratio_K_2)
+        #print("tem_value: hex    ",hex(tem_value))
+        print("recived distance  (mm): %d  , control value:  %d\n",tem_distance,tem_value)
         self.motor_position_set(tem_value)
-
-
-    def float_to_uint32(f):
-        # 将浮点数打包为 IEEE 754 单精度格式（4字节）
-        packed = struct.pack('>f', f)
-        # 解包为 uint32
-        return struct.unpack('>I', packed)[0]
 
 if __name__ == "__main__":
     app = SerialLiftingMotor()

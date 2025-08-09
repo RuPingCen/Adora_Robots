@@ -393,8 +393,8 @@ void read_uart_buffer(void *dora_context)
 }
 
 int run(void *dora_context);
-void cmd_vel_callback(char *data,size_t data_len);
-
+void analy_dora_input_data(char *data,size_t data_len);
+void cmd_vel_callback(float speed_x,float speed_w);
 int main()
 {
 	std::cout << "AdoraMini chassis node for dora " << std::endl;
@@ -476,7 +476,7 @@ int run(void *dora_context)
 				char *data;
 				size_t data_len;
 				read_dora_input_data(event, &data, &data_len);
-				cmd_vel_callback(data,data_len);
+				analy_dora_input_data(data,data_len);
 			}
       }
       else if (ty == DoraEventType_Stop)
@@ -493,8 +493,8 @@ int run(void *dora_context)
     return 0;
 }
 
-
-void cmd_vel_callback(char *data,size_t data_len)
+ 
+void analy_dora_input_data(char *data,size_t data_len)
 {
 	json j_cmd_vel;
 	// 将数据转化为字符串
@@ -513,9 +513,9 @@ void cmd_vel_callback(char *data,size_t data_len)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	cout << "Twist event count: "<<count_1<<" data_seq "<< j_cmd_vel["seq"]<<" time is: " << 
-			std::fixed << std::setprecision(9) << tv.tv_sec +tv.tv_usec*1e-9<<" s " <<std::endl;
-	std::cout << "<----print---->" <<j_cmd_vel<< std::endl;
+	//cout << "Twist event count: "<<count_1<<" data_seq "<< j_cmd_vel["seq"]<<" time is: " << 
+	//		std::fixed << std::setprecision(9) << tv.tv_sec +tv.tv_usec*1e-9<<" s " <<std::endl;
+	//std::cout << "<----print---->" <<j_cmd_vel<< std::endl;
 	cmdvel_twist.header.frame_id = j_cmd_vel["header"]["frame_id"];
 	cmdvel_twist.header.seq = 	j_cmd_vel ["header"]["seq"];
 	cmdvel_twist.header.sec = j_cmd_vel["header"]["stamp"]["sec"];
@@ -530,18 +530,26 @@ void cmd_vel_callback(char *data,size_t data_len)
 	cout << "speed_x: "<<cmdvel_twist.linear.x 
 		 << "  speed_y: "<<cmdvel_twist.linear.y<< "  speed_w: "<<cmdvel_twist.angular.z<< endl;
 	
+	// linear m/s     angular  rad/s
+	cmd_vel_callback(cmdvel_twist.linear.x,cmdvel_twist.angular.z);
+ 
+ 
+}
+
+void cmd_vel_callback(float speed_x,float speed_w)
+{
+  
 	if (control_mode == 1)
     {
-        dt_control1(cmdvel_twist.linear.x* 1000,cmdvel_twist.angular.z);
+        dt_control1(speed_x* 1000,speed_w);
     }
     else if (control_mode == 2)
     {
         s16 TempLSpeed = 0, TempRSpeed = 0;
 
-        TempLSpeed = cmdvel_twist.linear.x * 1000  - cmdvel_twist.angular.z* Base_Width / 2.0;
-        TempRSpeed = cmdvel_twist.linear.x * 1000 + cmdvel_twist.angular.z* Base_Width / 2.0;
+        TempLSpeed = speed_x * 1000  - speed_w* Base_Width / 2.0;
+        TempRSpeed = speed_x * 1000 + speed_w* Base_Width / 2.0;
         dt_control2(TempLSpeed, TempRSpeed);
     }
- 
  
 }

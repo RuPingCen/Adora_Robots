@@ -362,8 +362,8 @@ void read_uart_buffer(void *dora_context)
 }
 
 int run(void *dora_context);
-void cmd_vel_callback(char *data,size_t data_len);
-
+void analy_dora_input_data(char *data,size_t data_len);
+void cmd_vel_callback(float speed_x,float speed_w);
 int main()
 {
 	std::cout << "AdoraMini chassis node for dora " << std::endl;
@@ -452,7 +452,7 @@ int run(void *dora_context)
 				char *data;
 				size_t data_len;
 				read_dora_input_data(event, &data, &data_len);
-				cmd_vel_callback(data,data_len);
+				analy_dora_input_data(data,data_len);
 			}
       }
       else if (ty == DoraEventType_Stop)
@@ -470,7 +470,7 @@ int run(void *dora_context)
 }
 
 
-void cmd_vel_callback(char *data,size_t data_len)
+void analy_dora_input_data(char *data,size_t data_len)
 {
 	json j_cmd_vel;
 	// 将数据转化为字符串
@@ -506,18 +506,26 @@ void cmd_vel_callback(char *data,size_t data_len)
 	cout << "speed_x: "<<cmdvel_twist.linear.x 
 		 << "  speed_y: "<<cmdvel_twist.linear.y<< "  speed_w: "<<cmdvel_twist.angular.z<< endl;
 	
+	// linear m/s     angular  rad/s
+	cmd_vel_callback(cmdvel_twist.linear.x,cmdvel_twist.angular.z);
+ 
+ 
+}
+
+void cmd_vel_callback(float speed_x,float speed_w)
+{
+  
 	if (control_mode == 1)
     {
-      adora_a2pro_control1(cmdvel_twist.linear.x* 1000,cmdvel_twist.angular.z* 1000);
+      adora_a2pro_control1(speed_x* 1000,speed_w* 1000);
     }
     else if (control_mode == 2)
     {
         s16 TempLSpeed = 0, TempRSpeed = 0;
 
-        TempLSpeed = cmdvel_twist.linear.x * 1000  - cmdvel_twist.angular.z* Base_Width / 2.0;
-        TempRSpeed = cmdvel_twist.linear.x * 1000 + cmdvel_twist.angular.z* Base_Width / 2.0;
+        TempLSpeed = speed_x * 1000  - speed_w* Base_Width / 2.0;
+        TempRSpeed = speed_x * 1000 + speed_w* Base_Width / 2.0;
         adora_a2pro_control2(TempLSpeed, TempRSpeed);
     }
- 
  
 }
