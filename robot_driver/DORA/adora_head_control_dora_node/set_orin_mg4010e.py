@@ -7,7 +7,7 @@ from MOTOR_MG4010E import MOTOR_MG4010E
  
 
 if __name__ == "__main__":
-    app = MOTOR_MG4010E(port="/dev/ttyACM0", baudrate=115200)
+    app = MOTOR_MG4010E(port="/dev/ttyUSB0", baudrate=115200)
     time.sleep(1)
     print("motor_mg4010e_clear_multi_loop_angle id 1")
     app.motor_mg4010e_clear_multi_loop_angle(1) 

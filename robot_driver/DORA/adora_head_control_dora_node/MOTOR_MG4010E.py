@@ -14,6 +14,8 @@ class MOTOR_MG4010E:
         self.init_serial(port, baudrate)
         self.motor_init()
 
+        self.cnt = 1
+
     def __del__(self): 
         self.motor_exit()
 
@@ -32,11 +34,18 @@ class MOTOR_MG4010E:
         except Exception as e:
             print("串口初始化失败:", e)
 
+    # 循环读取id1 和 id2 电机的位置
     def run(self):
  
         #while True:
- 
-        self.motor_mg4010e_read_multi_loop_angle(2)
+        print("read motor id: ", self.cnt," position")
+        if self.cnt <= 1:
+            self.motor_mg4010e_read_multi_loop_angle(1)
+        else:
+            self.motor_mg4010e_read_multi_loop_angle(2)
+            self.cnt = 0
+
+        self.cnt = self.cnt + 1
         time.sleep(0.1)
 
         uart_buffer_data = self.ser.read_all()  
@@ -82,7 +91,8 @@ class MOTOR_MG4010E:
             position_bytes = uart_buffer_data[index_i+5:index_i+13]##左闭区 右开区间 高位存低地址
             #print(f"HEX: [{position_bytes}]   ]")
             self.motor_positon_read = int.from_bytes(position_bytes,'little',signed = True)
-            print("mg4010e position:", self.motor_positon_read)
+            id = uart_buffer_data[index_i+2]
+            print("mg4010e id ",id,"   position:", self.motor_positon_read)
 
 
     def motor_init(self):
@@ -288,6 +298,7 @@ class MOTOR_MG4010E:
         self.ser.write(data_array_1)
 
     # 13.多圈位置控制模式2 
+    # 注意该函数没有考虑减速比， mg4010e 电机减速比为10
     #控制值 angle 为 int64_t 类型，对应实际位置为 0.01degree/LSB，即 36000 代表 360°，
     #控制值 speed 限制了电机转动的最大速度，为 uint32_t 类型，对应实际转速 0.01dps/LSB，即 36000 代表 360dps。。
     def motor_mg4010e_set_multi_loop_angle_control2(self,motor_id,angle,speed):
