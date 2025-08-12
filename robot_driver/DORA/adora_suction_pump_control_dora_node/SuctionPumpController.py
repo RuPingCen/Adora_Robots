@@ -166,7 +166,7 @@ class SuctionPumpController:
 
 
 if __name__ == "__main__":
-    controller = SuctionPumpController(port="/dev/ttyUSB0", baudrate=115200)
+    controller = SuctionPumpController(port="/dev/ttyACM0", baudrate=9600)
     # 用法1 修改波特率
     #controller.set_baudrate_mode(115200)
     while True:

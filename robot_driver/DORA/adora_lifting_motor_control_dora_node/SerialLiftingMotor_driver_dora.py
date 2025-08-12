@@ -36,7 +36,7 @@ class Operator:
     ):
         if "tick" == dora_input["id"]:
             print("tick event")
-            self.app.motor_position_read()
+            #self.app.motor_position_read()
             self.app.run()
             send_output(
                 "cur_position",

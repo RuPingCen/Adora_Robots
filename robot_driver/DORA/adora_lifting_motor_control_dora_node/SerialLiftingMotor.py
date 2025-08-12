@@ -56,12 +56,12 @@ class SerialLiftingMotor:
         print(f"HEtem_bytes_strX: [{tem_bytes_str}]")
 
         recives_crc = self.calculate_crc16(tem_bytes)
-        if recives_crc:
+        #if recives_crc:
             # 打印十六进制和ASCII格式
-            hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
-            crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
-            ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
-            print(f"HEX: [{hex_str}] CRC: [{crc_str}]  ASCII: [{ascii_str}]")
+            #hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
+            #crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
+            #ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
+            #print(f"HEX: [{hex_str}] CRC: [{crc_str}]  ASCII: [{ascii_str}]")
         #print("daying:")
 
 
@@ -71,9 +71,10 @@ class SerialLiftingMotor:
 
             position_bytes = bytearray()
             position_bytes.extend([uart_buffer_data[5], uart_buffer_data[6],uart_buffer_data[3], uart_buffer_data[4]]) #高位存低地址
+
             self.motor_positon_read = int.from_bytes(position_bytes,'big',signed = True)
-            print("befor position:", self.motor_positon_read)
-            self.motor_positon_read = int(self.motor_positon_read/self.Ratio_K_2*self.Ratio_K_1)/1
+            #print("befor position:", self.motor_positon_read)
+            self.motor_positon_read = int(self.motor_positon_read/self.Ratio_K_2*self.Ratio_K_1)
             print("after position:", self.motor_positon_read)
 
 
@@ -196,7 +197,7 @@ class SerialLiftingMotor:
         data_array_1[5] = position_value & 0xff
 
 
-        print(f"CRC16: 0x{data_array_1.hex().upper()}")
+        #print(f"CRC16: 0x{data_array_1.hex().upper()}")
 
         crc_values = self.calculate_crc16(data_array_1) # calculate crc
         data_array_1.extend([crc_values[0], crc_values[1]])
@@ -224,10 +225,12 @@ class SerialLiftingMotor:
         self.motor_position_set(tem_value)
 
 if __name__ == "__main__":
-    app = SerialLiftingMotor()
-    app.run()
+    app = SerialLiftingMotor(port="/dev/ttyACM0",baudrate=19200)
+    
     while True:
-        app.cmd_vel_callback(200)
-        time.sleep(20)   
-        app.cmd_vel_callback(0)
-        time.sleep(20)  
+        app.run()
+        time.sleep(0.5) 
+        # app.cmd_vel_callback(200)
+        # time.sleep(20)   
+        # app.cmd_vel_callback(0)
+        # time.sleep(20)  

@@ -36,55 +36,74 @@ class MOTOR_MG4010E:
  
         #while True:
  
-        self.motor_position_read()
-        #time.sleep(0.1)
+        self.motor_mg4010e_read_multi_loop_angle(2)
+        time.sleep(0.1)
 
         uart_buffer_data = self.ser.read_all()  
-
-        if(len(uart_buffer_data) < 7):
-            print("uart_buffer_data < 7")
+        buffer_len = len(uart_buffer_data)
+        if( buffer_len< 6):
+            print("uart_buffer_data < 6")
             return
         
-        tem_bytes = bytearray()
-        tem_bytes.extend(uart_buffer_data[0:7]) #高位存低地址
-        tem_bytes_str = ' '.join(f"{b:02X}" for b in tem_bytes)
-        print(f"HEtem_bytes_strX: [{tem_bytes_str}]")
+        # step1 寻找帧头
+        index_i =0
+        while(index_i<buffer_len):
+            if(uart_buffer_data[index_i] == 0x3E):
+                break
+            index_i = index_i+1
 
-        recives_crc = self.calculate_crc16(tem_bytes)
-        if recives_crc:
-            # 打印十六进制和ASCII格式
-            hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
-            crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
-            ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
-            print(f"HEX: [{hex_str}] CRC: [{crc_str}]  ASCII: [{ascii_str}]")
-        #print("daying:")
+        #print("index_i: ",index_i)
+        # 检查校验信息
+        if(index_i+5<=buffer_len): 
+            tem_bytes = bytearray()
+            tem_bytes.extend(uart_buffer_data[index_i+0:index_i+4])#左闭区 右开区间 #高位存低地址
+            tem_bytes_str = ' '.join(f"{b:02X}" for b in tem_bytes)
+            #print(f"frame head: [{tem_bytes_str}]")
+            recives_crc = self.calculate_crc(tem_bytes)
+            if recives_crc:
+                # 打印十六进制和ASCII格式
+                hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
+                crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
+                #ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
+                #print(f"HEX: [{hex_str}] CRC: [{crc_str}] ]")
+            #print("daying:")
 
+            if uart_buffer_data[index_i+4] != recives_crc[0]: #校验不对
+                print(["error with calculate crc ",hex(uart_buffer_data[index_i+4]),"   ",recives_crc[0]])
+                return
+        else:
+            print("index_i+5<=len ")
+            return
+        
 
-        if(uart_buffer_data[0] == 0x01  
-            and uart_buffer_data[1] == 0x03 
-            and uart_buffer_data[2] == 0x04):
+        if(uart_buffer_data[index_i] == 0x3E and uart_buffer_data[index_i+1] == 0x92 
+            and uart_buffer_data[index_i+3] == 0x08):
 
-            position_bytes = bytearray()
-            position_bytes.extend([uart_buffer_data[5], uart_buffer_data[6],uart_buffer_data[3], uart_buffer_data[4]]) #高位存低地址
-            self.motor_positon_read = int.from_bytes(position_bytes,'big',signed = True)
-            print("position:", self.motor_positon_read)
+            position_bytes = uart_buffer_data[index_i+5:index_i+13]##左闭区 右开区间 高位存低地址
+            #print(f"HEX: [{position_bytes}]   ]")
+            self.motor_positon_read = int.from_bytes(position_bytes,'little',signed = True)
+            print("mg4010e position:", self.motor_positon_read)
 
 
     def motor_init(self):
-        print("motor on ...")
+        print("motor on id1...")
         self.motor_mg4010e_On(1)
         time.sleep(0.05)
-        print("release brake ...")
+        print("release brake id1...")
         self.motor_mg4010e_set_brake(1,0x01) #释放刹车
         time.sleep(0.05)
-        print("clear error code ...")
+        print("clear error code id1...")
         self.motor_mg4010e_clear_error_code(1)
         time.sleep(0.05)
-        # self.motor_mg4010e_On(1)
-        # time.sleep(0.05)
-        # self.motor_mg4010e_set_brake(1,0x01) #释放刹车
-        # time.sleep(0.05)
-        # self.motor_mg4010e_clear_error_code(1)
+
+        print("motor on id2...")
+        self.motor_mg4010e_On(2)
+        time.sleep(0.05)
+        print("release brake id2...")
+        self.motor_mg4010e_set_brake(2,0x01) #释放刹车
+        time.sleep(0.05)
+        print("clear error code id2...")
+        self.motor_mg4010e_clear_error_code(2)
 
     def motor_exit(self):
         self.motor_mg4010e_Off(1)
@@ -151,54 +170,7 @@ class MOTOR_MG4010E:
         # 发送数据
         self.ser.write(data_array_1)
 
-    #设置当前位置为0点（写入到ROM）
-    # 设置电机当前位置的编码器原始值作为电机上电后的初始零点
-    def motor_mg4010e_set_oringin(self,motor_id):
-        data_array_1 = bytearray()
-        data_array_1.extend([0x3E, 0x19, 0x00, 0x00])  # read motor global position
-        data_array_1[2] = motor_id
-        crc_values = self.calculate_crc(data_array_1) # calculate crc
-        data_array_1.extend([crc_values[0]])
-        if not self.ser.is_open:
-            self.ser.open()
-        # 发送数据
-        self.ser.write(data_array_1)
 
-    # 清除电机圈数信息命令
-    def motor_mg4010e_clear_multi_loop_angle(self,motor_id):
-        data_array_1 = bytearray()
-        data_array_1.extend([0x3E, 0x92, 0x00, 0x00])  # read motor global position
-        data_array_1[2] = motor_id
-        crc_values = self.calculate_crc(data_array_1) # calculate crc
-        data_array_1.extend([crc_values[0]])
-        if not self.ser.is_open:
-            self.ser.open()
-        # 发送数据
-        self.ser.write(data_array_1)
-
-    # 读取多圈角度命令
-    def motor_mg4010e_read_multi_loop_angle(self,motor_id):
-        data_array_1 = bytearray()
-        data_array_1.extend([0x3E, 0x92, 0x00, 0x00])  # read motor global position
-        data_array_1[2] = motor_id
-        crc_values = self.calculate_crc(data_array_1) # calculate crc
-        data_array_1.extend([crc_values[0]])
-        if not self.ser.is_open:
-            self.ser.open()
-        # 发送数据
-        self.ser.write(data_array_1)
-
-    # 读取单圈角度命令
-    def motor_mg4010e_read_single_loop_angle(self,motor_id):
-        data_array_1 = bytearray()
-        data_array_1.extend([0x3E, 0x94, 0x00, 0x00])  # read motor global position
-        data_array_1[2] = motor_id
-        crc_values = self.calculate_crc(data_array_1) # calculate crc
-        data_array_1.extend([crc_values[0]])
-        if not self.ser.is_open:
-            self.ser.open()
-        # 发送数据
-        self.ser.write(data_array_1)
 
 
     def motor_mg4010e_close(self,motor_id):
@@ -249,7 +221,40 @@ class MOTOR_MG4010E:
         # 发送数据
         self.ser.write(data_array_1)
 
-    # 多圈位置控制模式1
+
+    # 10. 转矩闭环控制
+    # 主机发送该命令以控制电机的转矩电流输出，控制值 iqControl 为 int16_t 类型，数值范围-2048~ 2048，
+    # 对应 MF 电机实际转矩电流范围-16.5A~16.5A，
+    # 对应 MG 电机实际转矩电流范围-33A~33A，母线电流和电机的实际扭矩因不同电机而异。
+    def motor_mg4010e_set_torque(self,motor_id,torque):
+        data_array_1 = bytearray()
+        data_array_1.extend([0x3E, 0xA1, 0x00, 0x02])  
+        data_array_1[2] = motor_id
+        crc_values = self.calculate_crc(data_array_1) # calculate crc
+        data_array_1.extend([crc_values[0]])
+
+        data_array_2 = bytearray()
+        data_array_2.extend([0x00, 0x00])  
+        if(torque > 2048):
+            torque = 2048  
+        elif(torque < -2048):
+            torque = -2048
+        print('torque: ',torque)
+        data_array_2[0] = torque & 0xff
+        data_array_2[1] = (torque>>8)& 0xff
+        crc_values2 = self.calculate_crc(data_array_2) # calculate crc
+        data_array_2.extend([crc_values2[0]])  
+
+        data_array_1.extend(data_array_2)
+        hex_str = ' '.join(f'{byte:02x}' for byte in data_array_1)
+        print("data_array_1",hex_str)  # 输出: '01 02 03' [4](@ref)
+        #print("data_array_2: ",data_array_2)
+        if not self.ser.is_open:
+            self.ser.open()
+        # 发送数据
+        self.ser.write(data_array_1)
+
+    # 12.多圈位置控制模式1
     # 控制值 angleControl 为 int64_t 类型，对应实际位置为 0.01degree/LSB，即 36000 代表 360°，
     # 电机转动方向由目标位置和当前位置的差值决定。
     # 测试中从0转到270为逆时针方向，从270度转到0为顺时针方向
@@ -282,7 +287,7 @@ class MOTOR_MG4010E:
         # 发送数据
         self.ser.write(data_array_1)
 
-    # 多圈位置控制模式2 
+    # 13.多圈位置控制模式2 
     #控制值 angle 为 int64_t 类型，对应实际位置为 0.01degree/LSB，即 36000 代表 360°，
     #控制值 speed 限制了电机转动的最大速度，为 uint32_t 类型，对应实际转速 0.01dps/LSB，即 36000 代表 360dps。。
     def motor_mg4010e_set_multi_loop_angle_control2(self,motor_id,angle,speed):
@@ -318,7 +323,7 @@ class MOTOR_MG4010E:
         # 发送数据
         self.ser.write(data_array_1)
 
-    # 主机发送该命令以控制电机的角度（单圈1角度）， 
+    # 14.主机发送该命令以控制电机的角度（单圈1角度）， 
     # 注意该电机的减速比1:10，即如何按表格中的命令发送36000，电机转动360度，但是实际只有外转子只转动了36度
     # 控制值 dir 设置电机转动的方向，为 uint8_t 类型， 0x00 代表顺时针， 0x01 代表逆时针
     # 控制值 angle 为 uint16_t 类型，数值范围 0~35999，对应实际位置为 0.01degree/LSB，
@@ -359,33 +364,57 @@ class MOTOR_MG4010E:
         self.ser.write(data_array_1)
  
  
-    # 转矩控制
-    # 主机发送该命令以控制电机的转矩电流输出，控制值 iqControl 为 int16_t 类型，数值范围-2048~ 2048，
-    # 对应 MF 电机实际转矩电流范围-16.5A~16.5A，
-    # 对应 MG 电机实际转矩电流范围-33A~33A，母线电流和电机的实际扭矩因不同电机而异。
-    def motor_mg4010e_set_torque(self,motor_id,torque):
+
+
+
+
+    # 21.设置当前位置为0点（写入到ROM）
+    # 设置电机当前位置的编码器原始值作为电机上电后的初始零点
+    def motor_mg4010e_set_oringin(self,motor_id):
         data_array_1 = bytearray()
-        data_array_1.extend([0x3E, 0xA1, 0x00, 0x04])  
+        data_array_1.extend([0x3E, 0x19, 0x00, 0x00])  # read motor global position
         data_array_1[2] = motor_id
         crc_values = self.calculate_crc(data_array_1) # calculate crc
         data_array_1.extend([crc_values[0]])
+        if not self.ser.is_open:
+            self.ser.open()
+        # 发送数据
+        self.ser.write(data_array_1)
 
-        data_array_2 = bytearray()
-        data_array_2.extend([0x00, 0x00])  
-        if(torque > 2048):
-            torque = 2048  
-        elif(torque < -2048):
-            torque = -2048
-        print('torque: ',torque)
-        data_array_2[1] = torque & 0xff
-        data_array_2[2] = (torque>>8)& 0xff
-        crc_values2 = self.calculate_crc(data_array_2) # calculate crc
-        data_array_2.extend([crc_values2[0]])  
 
-        data_array_1.extend(data_array_2)
-        hex_str = ' '.join(f'{byte:02x}' for byte in data_array_1)
-        print("data_array_1",hex_str)  # 输出: '01 02 03' [4](@ref)
-        #print("data_array_2: ",data_array_2)
+    # 22.读取多圈角度命令
+    def motor_mg4010e_read_multi_loop_angle(self,motor_id):
+        data_array_1 = bytearray()
+        data_array_1.extend([0x3E, 0x92, 0x00, 0x00])  # read motor global position
+        data_array_1[2] = motor_id
+        crc_values = self.calculate_crc(data_array_1) # calculate crc
+        data_array_1.extend([crc_values[0]])
+        if not self.ser.is_open:
+            self.ser.open()
+        # 发送数据
+        self.ser.write(data_array_1)
+
+    # 23.清除电机圈数信息命令
+    def motor_mg4010e_clear_multi_loop_angle(self,motor_id):
+        data_array_1 = bytearray()
+        data_array_1.extend([0x3E, 0x93, 0x00, 0x00])  # read motor global position
+        data_array_1[2] = motor_id
+        crc_values = self.calculate_crc(data_array_1) # calculate crc
+        data_array_1.extend([crc_values[0]])
+        if not self.ser.is_open:
+            self.ser.open()
+        # 发送数据
+        self.ser.write(data_array_1)
+
+
+
+    # 24.读取单圈角度命令
+    def motor_mg4010e_read_single_loop_angle(self,motor_id):
+        data_array_1 = bytearray()
+        data_array_1.extend([0x3E, 0x94, 0x00, 0x00])  # read motor global position
+        data_array_1[2] = motor_id
+        crc_values = self.calculate_crc(data_array_1) # calculate crc
+        data_array_1.extend([crc_values[0]])
         if not self.ser.is_open:
             self.ser.open()
         # 发送数据
@@ -393,7 +422,19 @@ class MOTOR_MG4010E:
 
 
 if __name__ == "__main__":
-    app = MOTOR_MG4010E(port="/dev/ttyUSB0", baudrate=115200)
+    app = MOTOR_MG4010E(port="/dev/ttyACM0", baudrate=115200)
+
+    app.motor_mg4010e_set_torque(1,0)#0力矩模式
+    time.sleep(1)
+    app.motor_mg4010e_set_torque(2,0)#0力矩模式
+    time.sleep(1)
+
+    while True:
+        app.run()
+        time.sleep(0.1)
+
+
+    #位置控制模式
     app.motor_mg4010e_set_multi_loop_angle_control2(1,0*10*100,30000)
     time.sleep(30)
     #app.run()
