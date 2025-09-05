@@ -1,3 +1,4 @@
+// tianji 添加了串口和网口通信
 extern "C"
 {
 #include "node_api.h"
@@ -10,6 +11,10 @@ extern "C"
 #include <cmath>
 #include <sys/time.h>
 #include <mutex>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 #include <cstdint>
 #include <memory>
@@ -20,9 +25,9 @@ extern "C"
 #include <chrono>
 
 //#include "chassis_mick_msg.hpp"
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+// #include <Eigen/Dense>
+// #include <Eigen/Core>
+// #include <Eigen/Geometry>
 
 #include "ros_dt_msg.h"
 #include "ros_dt_control.h"
@@ -35,7 +40,18 @@ using json = nlohmann::json;
 
 using namespace std;
 
- 
+// UDP socket and address structures
+int sockfd;
+struct sockaddr_in servaddr, cliaddr;
+
+// UDP communication parameters
+string udp_local_port_str;
+string udp_target_ip;
+string udp_target_port_str;
+int udp_local_port;
+int udp_target_port;
+
+int communication_mode = 0; // 0 for serial, 1 for UDP
 
 serial::Serial ros_ser;
 
@@ -96,16 +112,26 @@ union Int16Data //union的作用为实现char数组和int16数据类型之间的
 //0：关闭  1：开启
 static void adora_a2pro_stop(u8 data)
 {
-  AdoraA2Pro_Stop.prot.Header = HEADER;
-  AdoraA2Pro_Stop.prot.Len = 0x07;
-  AdoraA2Pro_Stop.prot.Cmd = 0x22;
-  AdoraA2Pro_Stop.prot.Data = data;
-  AdoraA2Pro_Stop.prot.Check = 0;
-    for (int i = 0; i < AdoraA2Pro_Stop.prot.Len - 2; i++)
-    {
-      AdoraA2Pro_Stop.prot.Check += AdoraA2Pro_Stop.data[i];
-    }
-    ser.write(AdoraA2Pro_Stop.data, sizeof(AdoraA2Pro_Stop.data));
+	AdoraA2Pro_Stop.prot.Header = HEADER;
+	AdoraA2Pro_Stop.prot.Len = 0x07;
+	AdoraA2Pro_Stop.prot.Cmd = 0x22;
+	AdoraA2Pro_Stop.prot.Data = data;
+	AdoraA2Pro_Stop.prot.Check = 0;
+	for (int i = 0; i < AdoraA2Pro_Stop.prot.Len - 2; i++)
+	{
+		AdoraA2Pro_Stop.prot.Check += AdoraA2Pro_Stop.data[i];
+	}
+
+	if (communication_mode == 0) 
+	{ // Serial
+		ser.write(AdoraA2Pro_Stop.data, sizeof(AdoraA2Pro_Stop.data));
+	} 
+	else 
+	{ // UDP
+		if (sendto(sockfd, AdoraA2Pro_Stop.data, sizeof(AdoraA2Pro_Stop.data), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
+			printf("sendto failed in adora_a2pro_stop");
+		}
+	}
 }
 
 
@@ -124,7 +150,16 @@ void enable_states_upload(u8 enable_flag)
     EnableStateUploadData.prot.Check += EnableStateUploadData.data[i];
   }
 
-  ser.write(EnableStateUploadData.data, sizeof(EnableStateUploadData.data));
+  if (communication_mode == 0) 
+  { // Serial
+    ser.write(EnableStateUploadData.data, sizeof(EnableStateUploadData.data));
+  } 
+  else 
+  { // UDP
+    if (sendto(sockfd, EnableStateUploadData.data, sizeof(EnableStateUploadData.data), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
+        printf("sendto failed in enable_states_upload");
+    }
+  }
 }
 // 当关闭包时调用，关闭
 void static mySigIntHandler(void)
@@ -133,7 +168,14 @@ void static mySigIntHandler(void)
     enable_states_upload(0);
 	//std::this_thread::sleep_for(std::chrono::milliseconds(200));
     //sleep(1);
-    // ser.close();
+    if (communication_mode == 0) 
+	{ // Serial
+        ser.close();
+    } 
+	else 
+	{ // UDP
+        close(sockfd);
+    }
    // ros::shutdown();
    //rclcpp::shutdown();
 }
@@ -155,7 +197,22 @@ void adora_a2pro_control1(s16 Vx, s16 Vw)
       AdoraA2ProData1.prot.Check += AdoraA2ProData1.data[i];
     }
 
-    ser.write(AdoraA2ProData1.data, sizeof(AdoraA2ProData1.data));
+    if (communication_mode == 0) 
+	{ // Serial
+        ser.write(AdoraA2ProData1.data, sizeof(AdoraA2ProData1.data));
+		printf("buffer: ");
+		for (u8 i = 0; i < sizeof(AdoraA2ProData1.data); i++)
+		{
+			printf("  %02X ",AdoraA2ProData1.data[i] );
+		}
+		printf("\n");
+    } 
+	else 
+	{ // UDP
+        if (sendto(sockfd, AdoraA2ProData1.data, sizeof(AdoraA2ProData1.data), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
+            printf("sendto failed in adora_a2pro_control1");
+        }
+    }
 
 }
 
@@ -175,7 +232,16 @@ void adora_a2pro_control2(s16 Lv, s16 Rv)
         AdoraA2ProData2.prot.Check += AdoraA2ProData2.data[i];
     }
 
-    ser.write(AdoraA2ProData2.data, sizeof(AdoraA2ProData2.data));
+    if (communication_mode == 0) 
+	{ // Serial
+        ser.write(AdoraA2ProData2.data, sizeof(AdoraA2ProData2.data));
+    } 
+	else 
+	{ // UDP
+        if (sendto(sockfd, AdoraA2ProData2.data, sizeof(AdoraA2ProData2.data), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
+            printf("sendto failed in adora_a2pro_control2");
+        }
+    }
 
 }
  
@@ -222,132 +288,68 @@ void adora_a2pro_control2(s16 Lv, s16 Rv)
 
 void read_uart_buffer(void *dora_context)
 {
-	
-	len = ser.available();
-	std::cout<<"  flage1:  len:"<<len<<std::endl;
-	if (len >= sizeof(AdoraA2Pro_RxData_ChassisState.data))
-	{
-		std::cout<<"  flage2  "<<std::endl;
-		ser.read(buffer, len);
-		memset(AdoraA2Pro_RxData_ChassisState.data, 0, sizeof(AdoraA2Pro_RxData_ChassisState.data));
-		for (u8 i = 0; i < sizeof(AdoraA2Pro_RxData_ChassisState.data); i++)
+	std::cout<<"  read_uart_buffer"<<std::endl;
+	if (communication_mode == 0) 
+	{ 
+		
+		len = ser.available();
+		std::cout<<"  serial:  len:"<<len<<std::endl;
+		if(len >= sizeof(AdoraA2Pro_RxData_ChassisState.data))
 		{
-			AdoraA2Pro_RxData_ChassisState.data[i] = buffer[i];
-		}
-		u16 TempCheck = 0;
-		for(u8 i=0;i<sizeof(AdoraA2Pro_RxData_ChassisState.data)-2;i++)
-		{
-			TempCheck += AdoraA2Pro_RxData_ChassisState.data[i];
-		}
-		std::cout<<"  flage3  "<<std::endl;
-		// 头和校验正确
-		if (AdoraA2Pro_RxData_ChassisState.prot.Header == HEADER && AdoraA2Pro_RxData_ChassisState.prot.Check == TempCheck && AdoraA2Pro_RxData_ChassisState.prot.Cmd == 0x80)
-		{
-			len_time = 0;
-			 
-			dadoraa2pro_msg.control_mode = AdoraA2Pro_RxData_ChassisState.data[4];
-			dadoraa2pro_msg.percentage = AdoraA2Pro_RxData_ChassisState.data[5];
-			dadoraa2pro_msg.voltage	= AdoraA2Pro_RxData_ChassisState.data[7]<<8+AdoraA2Pro_RxData_ChassisState.data[6];
-			dadoraa2pro_msg.flage	= AdoraA2Pro_RxData_ChassisState.data[9]<<8+AdoraA2Pro_RxData_ChassisState.data[8];
-			dadoraa2pro_msg.error_flage	= AdoraA2Pro_RxData_ChassisState.data[11]<<8+AdoraA2Pro_RxData_ChassisState.data[10];
-			
-			Int16Data_tem.int16_dat = 0;
-			Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[12];
-			Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[13];
-			dadoraa2pro_msg.vx	= Int16Data_tem.int16_dat;
-
-			Int16Data_tem.int16_dat = 0;
-			Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[14];
-			Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[15];
-			dadoraa2pro_msg.wz	= Int16Data_tem.int16_dat;
-
-			Int16Data_tem.int16_dat = 0;
-			Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[16];
-			Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[17];
-			dadoraa2pro_msg.vl	= Int16Data_tem.int16_dat;
-
-			Int16Data_tem.int16_dat = 0;
-			Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[18];
-			Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[19];
-			dadoraa2pro_msg.vr	= Int16Data_tem.int16_dat;
-
-
-
-			std::cout<<"  control_mode:  "<<dadoraa2pro_msg.control_mode
-					 <<"  percentage:  "<<dadoraa2pro_msg.control_mode
-					 <<"  voltage:  "<<dadoraa2pro_msg.voltage
-					 <<"  flage:  "<<dadoraa2pro_msg.flage
-					 <<"  error_flage:  "<<dadoraa2pro_msg.error_flage
-					 <<"   vx: " <<dadoraa2pro_msg.vx
-					 <<"   wz: " <<dadoraa2pro_msg.wz
-					 <<std::endl; 
-		 
-
-			// 消息赋值
-			if (control_mode == 1)
+			ser.read(buffer, len);
+	 
+			printf("buffer: ");
+			for (u8 i = 0; i < len; i++)
 			{
-			  
-				//std::cout<<"  position_x:  "<<position_x<<"  position_y:  "<<position_y<<"   position_w: " <<position_w<<std::endl; 
-				std::cout<<"  linear_x:  "<<dadoraa2pro_msg.vx<<"  position_y:  "<<0<<"   linear_w: " <<dadoraa2pro_msg.wz<<std::endl; 
-				struct timeval tv;
-				gettimeofday(&tv, NULL); 
-				json j_odom_pub;
-				j_odom_pub["header"]["frame_id"] = "odom";
-				j_odom_pub ["header"]["seq"] = counter_odom_pub++;
-				j_odom_pub["header"]["stamp"]["sec"] = tv.tv_sec;
-				j_odom_pub["header"]["stamp"]["nanosec"] = tv.tv_usec*1e3;
-				j_odom_pub["pose"]["position"]["x"] = 0;
-				j_odom_pub["pose"]["position"]["y"] = 0;
-				j_odom_pub["pose"]["position"]["z"] = 0;
-			
-				j_odom_pub["pose"]["orientation"]["x"] = 0;
-				j_odom_pub["pose"]["orientation"]["y"] = 0;
-				j_odom_pub["pose"]["orientation"]["z"] = 0;
-				j_odom_pub["pose"]["orientation"]["w"] = 1;
-			
-				j_odom_pub["twist"]["linear"]["x"] = dadoraa2pro_msg.vx;
-				j_odom_pub["twist"]["linear"]["y"] = 0;
-				j_odom_pub["twist"]["linear"]["z"] = 0;
-			
-				j_odom_pub["twist"]["angular"]["x"] = 0;
-				j_odom_pub["twist"]["angular"]["y"] = 0;
-				j_odom_pub["twist"]["angular"]["z"] = dadoraa2pro_msg.wz;
-			
-			
-				// 将 JSON 对象序列化为字符串
-				std::string json_string = j_odom_pub.dump(4); // 参数 4 表示缩进宽度
-				// 将字符串转换为 char* 类型
-				char *c_json_string = new char[json_string.length() + 1];
-				strcpy(c_json_string, json_string.c_str());
-				std::string out_id = "Odometry";
-				// std::cout<<json_string;
-				int result = dora_send_output(dora_context, &out_id[0], out_id.length(), c_json_string, std::strlen(c_json_string));
-				if (result != 0)
-				{
-					std::cerr << "failed to send output" << std::endl;
-				}
-
-				memset(RXMode1.data, 0, sizeof(RXMode1.data));
+				printf("  %02X ",buffer[i] );
 			}
-			 
-		}
+			printf("\n");
+		}   
 		else
 		{
-			printf("not read accuracy,SUM:%02X,Check:%02X\n\n",TempCheck,RXRobotData20MS.prot.Check );
-			len = ser.available();
-			// 清空数据残余
-			if (len > 0 && len < 200)
+			len_time++;
+			if (len_time > 100)
 			{
-				ser.read(data, len);
+				printf("len_time:%d\n",len_time);
+				len_time = 0;
+				//open20ms(control_mode);
+				enable_states_upload(1);
+				printf("ros dt open 20cm\n");               
 			}
-			else
+		}	 
+    } 
+	else if (communication_mode == 1) 
+	{ // UDP
+		// For UDP data reception in serial mode (if needed)
+		socklen_t len_addr = sizeof(servaddr);
+		len = recvfrom(sockfd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&servaddr, &len_addr); // Use MSG_DONTWAIT for non-blocking UDP
+		if (len == -1) 
+		{
+			if (errno == EWOULDBLOCK || errno == EAGAIN) 
 			{
-				ser.read(data, 200);
+				// No data available, return to avoid blocking
+				return;
+			} 
+			else 
+			{
+				perror("recvfrom failed");
+				return;
 			}
-			len_time = 0;
 		}
-	}
-	else
+		if(len < sizeof(AdoraA2Pro_RxData_ChassisState.data))
+		{
+			std::cout << "ERROR: UDP Received len < sizeof(AdoraA2Pro_RxData_ChassisState.data, length: " << len << std::endl;
+			// Process UDP data here if necessary
+		}
+
+		
+         
+    }
+
+		//print
+
+
+	if(len < sizeof(AdoraA2Pro_RxData_ChassisState.data))
 	{
 		len_time++;
 		if (len_time > 100)
@@ -358,9 +360,130 @@ void read_uart_buffer(void *dora_context)
 			enable_states_upload(1);
 			printf("ros dt open 20cm\n");               
 		}
-	}         
-}
+		return ;
+	}   
+			printf("buffer: ");
+			for (u8 i = 0; i < len; i++)
+			{
+				printf("  %02X ",buffer[i] );
+			}
+			printf("\n");
 
+
+	memset(AdoraA2Pro_RxData_ChassisState.data, 0, sizeof(AdoraA2Pro_RxData_ChassisState.data));
+	for (u8 i = 0; i < sizeof(AdoraA2Pro_RxData_ChassisState.data); i++)
+	{
+		AdoraA2Pro_RxData_ChassisState.data[i] = buffer[i];
+	}
+	u16 TempCheck = 0;
+	for(u8 i=0;i<sizeof(AdoraA2Pro_RxData_ChassisState.data)-2;i++)
+	{
+		TempCheck += AdoraA2Pro_RxData_ChassisState.data[i];
+	}
+	//std::cout<<"  flage3  "<<std::endl;
+	// 头和校验正确
+	if (AdoraA2Pro_RxData_ChassisState.prot.Header == HEADER 
+		&& AdoraA2Pro_RxData_ChassisState.prot.Check == TempCheck 
+		&& AdoraA2Pro_RxData_ChassisState.prot.Cmd == 0x80)
+	{
+		len_time = 0;
+			
+		dadoraa2pro_msg.control_mode = AdoraA2Pro_RxData_ChassisState.data[4];
+		dadoraa2pro_msg.percentage = AdoraA2Pro_RxData_ChassisState.data[5];
+		dadoraa2pro_msg.voltage	= AdoraA2Pro_RxData_ChassisState.data[7]<<8+AdoraA2Pro_RxData_ChassisState.data[6];
+		dadoraa2pro_msg.flage	= AdoraA2Pro_RxData_ChassisState.data[9]<<8+AdoraA2Pro_RxData_ChassisState.data[8];
+		dadoraa2pro_msg.error_flage	= AdoraA2Pro_RxData_ChassisState.data[11]<<8+AdoraA2Pro_RxData_ChassisState.data[10];
+		
+		Int16Data_tem.int16_dat = 0;
+		Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[12];
+		Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[13];
+		dadoraa2pro_msg.vx	= Int16Data_tem.int16_dat;
+
+		Int16Data_tem.int16_dat = 0;
+		Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[14];
+		Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[15];
+		dadoraa2pro_msg.wz	= Int16Data_tem.int16_dat;
+
+		Int16Data_tem.int16_dat = 0;
+		Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[16];
+		Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[17];
+		dadoraa2pro_msg.vl	= Int16Data_tem.int16_dat;
+
+		Int16Data_tem.int16_dat = 0;
+		Int16Data_tem.byte_data[0] = AdoraA2Pro_RxData_ChassisState.data[18];
+		Int16Data_tem.byte_data[1] = AdoraA2Pro_RxData_ChassisState.data[19];
+		dadoraa2pro_msg.vr	= Int16Data_tem.int16_dat;
+
+
+
+		std::cout<<"  control_mode:  "<<dadoraa2pro_msg.control_mode
+					<<"  percentage:  "<<dadoraa2pro_msg.control_mode
+					<<"  voltage:  "<<dadoraa2pro_msg.voltage
+					<<"  flage:  "<<dadoraa2pro_msg.flage
+					<<"  error_flage:  "<<dadoraa2pro_msg.error_flage
+					<<"   vx: " <<dadoraa2pro_msg.vx
+					<<"   wz: " <<dadoraa2pro_msg.wz
+					<<std::endl; 
+		
+
+		// 消息赋值
+		if (control_mode == 1)
+		{
+			
+			//std::cout<<"  position_x:  "<<position_x<<"  position_y:  "<<position_y<<"   position_w: " <<position_w<<std::endl; 
+			std::cout<<"  linear_x:  "<<dadoraa2pro_msg.vx<<"  position_y:  "<<0<<"   linear_w: " <<dadoraa2pro_msg.wz<<std::endl; 
+			struct timeval tv;
+			gettimeofday(&tv, NULL); 
+			json j_odom_pub;
+			j_odom_pub["header"]["frame_id"] = "odom";
+			j_odom_pub ["header"]["seq"] = counter_odom_pub++;
+			j_odom_pub["header"]["stamp"]["sec"] = tv.tv_sec;
+			j_odom_pub["header"]["stamp"]["nanosec"] = tv.tv_usec*1e3;
+			j_odom_pub["pose"]["position"]["x"] = 0;
+			j_odom_pub["pose"]["position"]["y"] = 0;
+			j_odom_pub["pose"]["position"]["z"] = 0;
+		
+			j_odom_pub["pose"]["orientation"]["x"] = 0;
+			j_odom_pub["pose"]["orientation"]["y"] = 0;
+			j_odom_pub["pose"]["orientation"]["z"] = 0;
+			j_odom_pub["pose"]["orientation"]["w"] = 1;
+		
+			j_odom_pub["twist"]["linear"]["x"] = dadoraa2pro_msg.vx;
+			j_odom_pub["twist"]["linear"]["y"] = 0;
+			j_odom_pub["twist"]["linear"]["z"] = 0;
+		
+			j_odom_pub["twist"]["angular"]["x"] = 0;
+			j_odom_pub["twist"]["angular"]["y"] = 0;
+			j_odom_pub["twist"]["angular"]["z"] = dadoraa2pro_msg.wz;
+		
+		
+			// 将 JSON 对象序列化为字符串
+			std::string json_string = j_odom_pub.dump(4); // 参数 4 表示缩进宽度
+			// 将字符串转换为 char* 类型
+			char *c_json_string = new char[json_string.length() + 1];
+			strcpy(c_json_string, json_string.c_str());
+			std::string out_id = "Odometry";
+			// std::cout<<json_string;
+			int result = dora_send_output(dora_context, &out_id[0], out_id.length(), c_json_string, std::strlen(c_json_string));
+			if (result != 0)
+			{
+				std::cerr << "failed to send output" << std::endl;
+			}
+
+			memset(RXMode1.data, 0, sizeof(RXMode1.data));
+		}
+			
+	}
+	else
+	{
+		printf("not read accuracy,SUM:%02X,Check:%02X\n\n",TempCheck,RXRobotData20MS.prot.Check );
+		printf("Header:%04X, HEADER :%04X\n",AdoraA2Pro_RxData_ChassisState.prot.Header,HEADER );
+		printf("cmd:%02X\n",AdoraA2Pro_RxData_ChassisState.prot.Cmd );
+	 
+	}
+	 
+	 
+}
 int run(void *dora_context);
 void analy_dora_input_data(char *data,size_t data_len);
 void cmd_vel_callback(float speed_x,float speed_w);
@@ -368,45 +491,96 @@ int main()
 {
 	std::cout << "AdoraMini chassis node for dora " << std::endl;
  
-	const char* port = std::getenv("USART_PORT");
-	usart_port = std::string(port);
-	baud_data = std::getenv("USART_BUAD") ? std::stoi(std::getenv("USART_BUAD")) : 115200;
-	time_out = std::getenv("USART_TIME_OUT") ? std::stoi(std::getenv("USART_TIME_OUT")) : 1000;
+	// Get communication mode from environment variable
+	communication_mode = std::getenv("COMMUNICATION_MODE") ? std::stoi(std::getenv("COMMUNICATION_MODE")) : 0; // Default to serial
 
+	cout << "Communication Mode: " << (communication_mode == 0 ? "Serial" : "UDP") << endl;
 
-	cout<<"usart_port:   "<<usart_port<<endl;
-	cout<<"baud_data:   "<<baud_data<<endl;
-	cout<<"control_mode:   "<<control_mode<<endl;
-	cout<<"time_out:   "<<time_out<<endl;
- 
- 
-	try
-	{
-		// 设置串口属性，并打开串口
-		ser.setPort(usart_port);
-		ser.setBaudrate(baud_data);
-		serial::Timeout to = serial::Timeout::simpleTimeout(50);
-		ser.setTimeout(to);
-		ser.open();
-	}
-	catch (serial::IOException &e)
-	{
-		printf("Unable to open port ");
-		return -1;
+	if (communication_mode == 0) 
+	{ // Serial communication
+		const char* port = std::getenv("USART_PORT");
+		usart_port = std::string(port);
+		baud_data = std::getenv("USART_BUAD") ? std::stoi(std::getenv("USART_BUAD")) : 115200;
+		time_out = std::getenv("USART_TIME_OUT") ? std::stoi(std::getenv("USART_TIME_OUT")) : 1000;
+
+		cout<<"usart_port:   "<<usart_port<<endl;
+		cout<<"baud_data:   "<<baud_data<<endl;
+		cout<<"control_mode:   "<<control_mode<<endl;
+		cout<<"time_out:   "<<time_out<<endl;
+
+		try
+		{
+			// 设置串口属性，并打开串口
+			ser.setPort(usart_port);
+			ser.setBaudrate(baud_data);
+			serial::Timeout to = serial::Timeout::simpleTimeout(50);
+			ser.setTimeout(to);
+			ser.open();
+		}
+		catch (serial::IOException &e)
+		{
+			printf("Unable to open serial port ");
+			return -1;
+		}
+
+		// 检测串口是否已经打开，并给出提示信息
+		if (ser.isOpen())
+		{
+			printf("Serial Port initialized\n");
+		}
+		else
+		{
+			return -1;
+		}
+		 
+	} 
+	else 
+	{ // UDP communication
+		udp_target_ip = std::getenv("UDP_TARGET_IP") ? std::string(std::getenv("UDP_TARGET_IP")) : "192.168.1.30"; // Default target IP
+		udp_local_port_str = std::getenv("UDP_LOCAL_PORT") ? std::string(std::getenv("UDP_LOCAL_PORT")) : "1231"; // Default local port
+		udp_target_port_str = std::getenv("UDP_TARGET_PORT") ? std::string(std::getenv("UDP_TARGET_PORT")) : "1231"; // Default target port
+
+		udp_local_port = std::stoi(udp_local_port_str);
+		udp_target_port = std::stoi(udp_target_port_str);
+
+		cout << "UDP Local Port: " << udp_local_port << endl;
+		cout << "UDP Target IP: " << udp_target_ip << endl;
+		cout << "UDP Target Port: " << udp_target_port << endl;
+
+		// Creating socket file descriptor
+		if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+		{
+			printf("socket creation failed");
+			return -1;
+		}
+
+		memset(&servaddr, 0, sizeof(servaddr));
+		memset(&cliaddr, 0, sizeof(cliaddr));
+
+		// Filling server information (target)
+		servaddr.sin_family = AF_INET;
+		servaddr.sin_port = htons(udp_target_port);
+		servaddr.sin_addr.s_addr = inet_addr(udp_target_ip.c_str());
+
+		// Filling client information (local)
+		cliaddr.sin_family = AF_INET;
+		cliaddr.sin_port = htons(udp_local_port);
+		cliaddr.sin_addr.s_addr = INADDR_ANY; // Bind to any available interface
+
+		// Bind the socket with the server address
+		if (bind(sockfd, (const struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0) 
+		{
+			printf("bind failed");
+			return -1;
+		}
+		printf("UDP Client initialized\n");
+
+		
 	}
 
-	// 检测串口是否已经打开，并给出提示信息
-	if (ser.isOpen())
-	{
-		// ser.flushInput(); // 清空输入缓存,把多余的无用数据删除
-		printf("Serial Port initialized");
-	}
-	else
-	{
-		return -1;
-	}
-	enable_states_upload(1);
-	 
+	usleep(200000);
+	enable_states_upload(1); 
+	usleep(200000);
 
  	auto dora_context = init_dora_context_from_env();
 	auto ret = run(dora_context);
@@ -443,16 +617,19 @@ int run(void *dora_context)
             read_dora_input_id(event, &id, &id_len);
             //cout<<"id_len: "<<id_len<<endl;
 
-            //read buffer and publish odometry
-            read_uart_buffer(dora_context);
- 
-
             if (strncmp(id, "CmdVelTwist",11) == 0)
             {
 				char *data;
 				size_t data_len;
 				read_dora_input_data(event, &data, &data_len);
 				analy_dora_input_data(data,data_len);
+			}
+			else if(strncmp(id, "tick",4) == 0)
+			{
+				//read buffer and publish odometry
+				read_uart_buffer(dora_context);
+				enable_states_upload(1); 
+
 			}
       }
       else if (ty == DoraEventType_Stop)

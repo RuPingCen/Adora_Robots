@@ -1,29 +1,43 @@
 import serial
 import time
 import struct
+import socket
 import numpy as np
 
 class SerialLiftingMotor: 
-    def __init__(self, port="/dev/ttyUSB0", baudrate=19200):
+    def __init__(self, mode="udp", 
+                 serial_port="/dev/ttyACM0",
+                 serial_baudrate=19200, 
+                 udp_ip="192.168.1.30", 
+                 udp_port=1232):
         self.ser = None  # 串口对象
         self.serial_opened = False  # 串口状态标志
+        self.udp_socket = None # UDP socket object
+        self.mode = mode
 
-        self.init_serial(port,baudrate)
+        if self.mode == "serial":
+            self.init_serial(serial_port, serial_baudrate)
+        elif self.mode == "udp":
+            self.udp_target_ip = udp_ip
+            self.udp_target_port = udp_port
+            self.init_udp_client()
+        else:
+            print("Invalid mode specified. Please choose 'serial' or 'udp'.")
+            return
+
         self.motor_init()
-
-
         #其中数值 3276800 表示电机转动100圈，电机转动1圈的数值是32768.
         self.max_lifting_distance = 700
         self.robot_name = "ADORA_A2_MAX"
-        self.Ratio_K_1 = 0.63636364 #// 电机每转动一圈丝杆行进的距离（单位 mm ） 
+        self.Ratio_K_1 = 0.63636364 #// 电机每转动一圈丝杆行进的距离（单位 mm ）
         self.Ratio_K_2 = 32768 # 电机转动1圈的编码器反馈的数值是32768
 
         self.MIN_MOTOR_POSITION = 0
         self.MAX_MOTOR_POSITION = 36044800  #//勿修改！！！ 32768*1100(圈) = 36044800 对应700mm行程的丝杠，
         self.motor_positon_read = 0
-        #self.motor_position_set(0)
+        self.motor_position_set(0)
         # 配置串口参数
-    def init_serial(self, port, baudrate):
+    def init_serial(self, port, baudrate=115200):
         try:
                 # 初始化串口，设置串口参数
             self.ser = serial.Serial(
@@ -33,22 +47,61 @@ class SerialLiftingMotor:
                 parity=serial.PARITY_NONE,  # 校验位，无校验位
                 stopbits=serial.STOPBITS_ONE,  # 停止位1位
                 timeout=0.1  # 超时时间
-            )
+        )
         except Exception as e:
             print("串口初始化失败:", e)
+
+    def init_udp_client(self):
+        try:
+            self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            print(f"UDP client initialized. Target: {self.udp_target_ip}:{self.udp_target_port}")
+        except Exception as e:
+            print(f"UDP client initialization failed: {e}")
+            self.udp_socket = None
+
+    def receive_udp_data(self):
+        if not self.udp_socket:
+            return None
+
+        try:
+            data, addr = self.udp_socket.recvfrom(1024) # Buffer size 1024 bytes
+            print(f"Received UDP data from {addr}: {data}")
+            return data
+        except socket.timeout:
+            return None # No data received within the timeout
+        except Exception as e:
+            print(f"Error receiving UDP data: {e}")
+            return None
+        
+    def send_udp_data(self, data_array: bytearray):
+        if not self.udp_socket:
+            print("UDP socket not initialized.")
+            return
+        try:
+            self.udp_socket.sendto(data_array, (self.udp_target_ip, self.udp_target_port))
+            print(f"Sent UDP data to {self.udp_target_ip}:{self.udp_target_port}: {data_array.hex()}")
+        except Exception as e:
+            print(f"Error sending UDP data: {e}")
 
     def run(self):
  
         #while True:
- 
+        uart_buffer_data = ''
         self.motor_position_read()
         time.sleep(0.01)
-
-        uart_buffer_data = self.ser.read_all()  
-
-        if(len(uart_buffer_data) < 7):
-            print("uart_buffer_data < 7")
+        if self.mode == "udp":
+            #print("DEBUG: UDP client mode: 'run' method is primarily for sending data.")
+            # If you need to receive data in client mode, you can call receive_udp_data here
+            uart_buffer_data = self.receive_udp_data()
+            # if udp_data:
+            #     print(f"Received UDP data in run: {udp_data}")
+        elif self.mode == "serial":
+            uart_buffer_data = self.ser.read_all()
+            
+        if not uart_buffer_data or len(uart_buffer_data) < 7:
+            print(f"DEBUG: Serial: No data or uart_buffer_data length < 7. Length: {len(uart_buffer_data) if uart_buffer_data else 0}")
             return
+        
         
         tem_bytes = bytearray()
         tem_bytes.extend(uart_buffer_data[0:7]) #高位存低地址
@@ -91,18 +144,29 @@ class SerialLiftingMotor:
         data_array_4 = bytearray()
         data_array_4.extend([0x01, 0x06, 0x00, 0x02, 0x05, 0xDC, 0x2A, 0xC3])  # speed 1500
         
-        if not self.ser.is_open:
-            self.ser.open()
+        if self.mode == "serial":
+            if not self.ser.is_open:
+                self.ser.open()
             
-        # 发送数据
-        self.ser.write(data_array_1)
-        time.sleep(0.2)
-        self.ser.write(data_array_2)
-        time.sleep(0.2)
-        self.ser.write(data_array_3)
-        time.sleep(0.2)
-        self.ser.write(data_array_4)
-        time.sleep(0.2)
+            # 发送数据
+            self.ser.write(data_array_1)
+            time.sleep(0.2)
+            self.ser.write(data_array_2)
+            time.sleep(0.2)
+            self.ser.write(data_array_3)
+            time.sleep(0.2)
+            self.ser.write(data_array_4)
+            time.sleep(0.2)
+            
+        elif self.mode == "udp":
+            self.send_udp_data(data_array_1)
+            time.sleep(0.2)
+            self.send_udp_data(data_array_2)
+            time.sleep(0.2)
+            self.send_udp_data(data_array_3)
+            time.sleep(0.2)
+            self.send_udp_data(data_array_4)
+            time.sleep(0.2)
 
     def calculate_crc16(self,data: bytes) -> bytes:
         auchCRCHi = [ # CRC 高位字节值表 */
@@ -172,10 +236,12 @@ class SerialLiftingMotor:
         data_array_1.extend([crc_values[0], crc_values[1]])
         #print(f"CRC16: 0x{data_array_1.hex().upper()}")
         
-        if not self.ser.is_open:
-            self.ser.open()
-        # 发送数据
-        self.ser.write(data_array_1)
+        if self.mode == "serial":
+            if not self.ser.is_open:
+                self.ser.open()
+            self.ser.write(data_array_1)# 发送数据
+        elif self.mode == "udp":
+            self.send_udp_data(data_array_1)
             
 
     #  电机M8010HG8 额定转速2500RPM (加速比8    0-277RPM)  4NM 的型号
@@ -201,11 +267,13 @@ class SerialLiftingMotor:
 
         crc_values = self.calculate_crc16(data_array_1) # calculate crc
         data_array_1.extend([crc_values[0], crc_values[1]])
-        if not self.ser.is_open:
-            self.ser.open()
-            
-        # 发送数据
-       # self.ser.write(data_array_1)
+        
+        if self.mode == "serial":
+            if not self.ser.is_open:
+                self.ser.open()
+            self.ser.write(data_array_1) # 发送数据
+        elif self.mode == "udp":
+            self.send_udp_data(data_array_1)
 
 
     # 输入参数 int32_msg 表示距离(单位 mm)
@@ -224,13 +292,25 @@ class SerialLiftingMotor:
         print("recived distance  (mm): %d  , control value:  %d\n",tem_distance,tem_value)
         self.motor_position_set(tem_value)
 
+ 
+
 if __name__ == "__main__":
-    app = SerialLiftingMotor(port="/dev/ttyACM0",baudrate=19200)
-    
+    # Example usage for serial mode
+    #print("Running in serial mode:")
+    #app = SerialLiftingMotor(mode="serial")
+    #Example usage for UDP mode
+    app = SerialLiftingMotor(mode="udp")  
+ 
+    i=0
     while True:
+        i=i+1
+        print(i)
         app.run()
         time.sleep(0.5) 
-        # app.cmd_vel_callback(200)
-        # time.sleep(20)   
-        # app.cmd_vel_callback(0)
-        # time.sleep(20)  
+        if i>0 and i<40:
+            app.cmd_vel_callback(0)
+        elif i>=40 and i < 80:
+            app.cmd_vel_callback(200)
+        else:
+            i=0
+   
