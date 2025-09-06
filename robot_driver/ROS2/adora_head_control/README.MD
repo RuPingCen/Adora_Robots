@@ -4,24 +4,7 @@ Adora机器人头部节点
 
 ## 1、**启动ROS节点**
 
-注意：运行ROS节点前需要按照标定步骤中的”**机器人头部位置标定**”,对以下4个参数进行标定，头部电机俯仰通道的（最小值-俯视极限位置、最大值-仰视极限位置、中位值-水平视角值进行标定）、旋转通道的中位值-水平向前看时旋转电机输出的数值。
-
-修改**adora_head_control/adora_head_control**文件夹中的 **adora_head_node.py** 文件，设置 “**PITCH_MIN_VALUE**”、“**PITCH_MAX_VALUE**”、 “**PITCH_MID_VALUE**”、“**YAW_MID_VALUE**”四个参数。
-
-| 参数名称        | 含义                                      |
-| --------------- | ----------------------------------------- |
-| PITCH_MIN_VALUE | 俯仰轴最小值 - 俯视极限位置下俯仰电机读数 |
-| PITCH_MAX_VALUE | 俯仰轴最大值 - 仰视极限位置下俯仰电机读数 |
-| PITCH_MID_VALUE | 俯仰轴中位值 - 水平视角位置下俯仰电机读数 |
-| YAW_MID_VALUE   | 偏航轴中位值 - 水平视角位置下旋转电机读数 |
-
-对**adora_head_node.py** 文件中四个参数默认值进行修改。
-
-![img](fig/fig2.png)
-
- 
-
-修改完成以后重新编译节点，并启动
+**step1:** 下载、编译节点，并启动
 
 ```shell
 colcon  build  
@@ -79,7 +62,22 @@ python set_all_id.py 2
 
 **2、标定机器人头部位置**
 
-随后启动脚本 “show_all_motor_position.py” 
+ 运行ROS节点前需要按照标定步骤中的”**机器人头部位置标定**”,对以下4个参数进行标定，头部电机俯仰通道的（最小值-俯视极限位置、最大值-仰视极限位置、中位值-水平视角值进行标定）、旋转通道的中位值-水平向前看时旋转电机输出的数值。
+
+修改**adora_head_control/adora_head_control**文件夹中的 **adora_head_node.py** 文件，设置 “**PITCH_MIN_VALUE**”、“**PITCH_MAX_VALUE**”、 “**PITCH_MID_VALUE**”、“**YAW_MID_VALUE**”四个参数。
+
+| 参数名称        | 含义                                      |
+| --------------- | ----------------------------------------- |
+| PITCH_MIN_VALUE | 俯仰轴最小值 - 俯视极限位置下俯仰电机读数 |
+| PITCH_MAX_VALUE | 俯仰轴最大值 - 仰视极限位置下俯仰电机读数 |
+| PITCH_MID_VALUE | 俯仰轴中位值 - 水平视角位置下俯仰电机读数 |
+| YAW_MID_VALUE   | 偏航轴中位值 - 水平视角位置下旋转电机读数 |
+
+对**adora_head_node.py** 文件中四个参数默认值进行修改。
+
+![img](fig/fig2.png)
+
+启动脚本 “show_all_motor_position.py” 
 
 ```
 python show_all_motor_position.py 
@@ -103,7 +101,7 @@ python show_all_motor_position.py
 
 <img src="fig/fig6.jpg" alt="img" style="zoom:50%;" />
 
- 
 
-## 机器人头部位置标定
+
+##  
 
