@@ -42,6 +42,9 @@ ros2 topic pub -r 10 /adora_robot/chassis/velocity_ctrl geometry_msgs/msg/Twist 
 
 角速度方向： 逆时针为正，速度方向：车头方向为x方向。
 ## 2  Adora A2 mini 底盘
+
+注意Mini底盘存在两种控制协议，mini使用 adora_chassis_bringup_V1.cpp 文件， pro 机型使用 adora_chassis_bringup_V2文件，需要再cmakelists.txt文件中修改。
+
 ### 2.1  Adora A2 mini (ROS2节点)
 
 启动A2 mini 底盘节点

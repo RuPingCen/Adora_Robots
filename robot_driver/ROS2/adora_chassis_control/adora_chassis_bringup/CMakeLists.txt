@@ -45,7 +45,7 @@ include_directories(
 
 
 # 适用于Adora-A1-Mini   Adora-A2-Pro
-add_executable(adora_chassis_bringup_node src/adora_chassis_bringup_V2.cpp)
+add_executable(adora_chassis_bringup_node src/adora_chassis_bringup_V1.cpp)
 
 target_link_libraries(adora_chassis_bringup_node
   ${rclcpp_LIBRARIES}
